@@ -150,40 +150,42 @@ func handle_message(message: String):
 			continue
 
 func _process(_delta):
-	if websocket:
-		websocket.poll()
+	if not websocket:
+		return
 
-		var state = websocket.get_ready_state()
-		match state:
-			WebSocketPeer.STATE_CONNECTING:
-				if connection_state == "DISCONNECTED":
-					connection_state = "CONNECTING"
-					log_debug("WebSocket state changed to CONNECTING")
+	websocket.poll()
 
-			WebSocketPeer.STATE_OPEN:
-				if connection_state == "CONNECTING":
-					log_debug("WebSocket state changed to OPEN")
-					websocket.send_text("wsok")
-					connection_state = "SESSION_CREATING"
-				while websocket.get_available_packet_count():
-					var packet = websocket.get_packet()
-					var message = packet.get_string_from_utf8()
-					handle_message(message)
+	var state = websocket.get_ready_state()
+	match state:
+		WebSocketPeer.STATE_CONNECTING:
+			if connection_state == "DISCONNECTED":
+				connection_state = "CONNECTING"
+				log_debug("WebSocket state changed to CONNECTING")
 
-			WebSocketPeer.STATE_CLOSING:
-				if connection_state != "CLOSING":
-					connection_state = "CLOSING"
-					log_debug("WebSocket state changed to CLOSING")
+		WebSocketPeer.STATE_OPEN:
+			if connection_state == "CONNECTING":
+				log_debug("WebSocket state changed to OPEN")
+				websocket.send_text("wsok")
+				connection_state = "SESSION_CREATING"
+			while websocket.get_available_packet_count():
+				var packet = websocket.get_packet()
+				var message = packet.get_string_from_utf8()
+				handle_message(message)
 
-			WebSocketPeer.STATE_CLOSED:
-				var code = websocket.get_close_code()
-				var reason = websocket.get_close_reason()
-				if connection_state != "DISCONNECTED":
-					connection_state = "DISCONNECTED"
-					log_debug("WebSocket closed with code: %s, reason: %s" % [code, reason])
-					# Wait a bit before reconnecting
-					await get_tree().create_timer(1.0).timeout
-					connect_websocket()
+		WebSocketPeer.STATE_CLOSING:
+			if connection_state != "CLOSING":
+				connection_state = "CLOSING"
+				log_debug("WebSocket state changed to CLOSING")
+
+		WebSocketPeer.STATE_CLOSED:
+			var code = websocket.get_close_code()
+			var reason = websocket.get_close_reason()
+			if connection_state != "DISCONNECTED":
+				connection_state = "DISCONNECTED"
+				log_debug("WebSocket closed with code: %s, reason: %s" % [code, reason])
+				# Wait a bit before reconnecting
+				await get_tree().create_timer(1.0).timeout
+				connect_websocket()
 
 func update_progress_bar(level: float):
 	progress_bar.value = level
